@@ -10,18 +10,18 @@ import Foundation
 struct PerformanceTimer {
   private(set) var times: [DispatchTime] = []
   private var isRunning: Bool = false
-  let timerReportingUnits: PerformanceTimerReportingUnits
+  let reportingUnits: PerformanceTimerUnits
   
   /// Time between the start and stop (or last lap) times
   var total: Double {
     guard let first = times.first, let last = times.last else { return 0.0 }
-    return timerReportingUnits.toReportingUnits(from: first.distance(to: last))
+    return reportingUnits.convert(from: first.distance(to: last))
   }
   
   /// Array of the lap times
   var laps: [Double] {
     zip(times, times.dropFirst()).map { previous, current in
-      timerReportingUnits.toReportingUnits(from: previous.distance(to: current))
+      reportingUnits.convert(from: previous.distance(to: current))
     }
   }
   
@@ -30,11 +30,11 @@ struct PerformanceTimer {
     guard let startTime = times.first else { return 0.0 }
     let endTime = isRunning ? DispatchTime.now() : times.last!
     
-    return timerReportingUnits.toReportingUnits(from: startTime.distance(to: endTime))
+    return reportingUnits.convert(from: startTime.distance(to: endTime))
   }
   
-  init(timerReportingUnits: PerformanceTimerReportingUnits = .nanoseconds) {
-    self.timerReportingUnits = timerReportingUnits
+  init(reportingUnits: PerformanceTimerUnits = .nanoseconds) {
+    self.reportingUnits = reportingUnits
   }
   
   /// Clear the previous times, record the start time and set the timer as running
@@ -52,7 +52,7 @@ struct PerformanceTimer {
       return 0.0
     }
     times.append(lapTime)
-    return timerReportingUnits.toReportingUnits(from: previousTime.distance(to: lapTime))
+    return reportingUnits.convert(from: previousTime.distance(to: lapTime))
   }
   
   /// Record the stop time, set the timer to stopped, then calculate the interval from the previous start/lap and return the value
@@ -69,7 +69,7 @@ struct PerformanceTimer {
   }
 }
 
-enum PerformanceTimerReportingUnits {
+enum PerformanceTimerUnits {
   case seconds, milliseconds, microseconds, nanoseconds
   
   var label: String {
@@ -82,7 +82,7 @@ enum PerformanceTimerReportingUnits {
   }
   
   /// Convert a `DispatchTimeInterval` to a time interval units of this enum
-  func toReportingUnits(from interval: DispatchTimeInterval) -> Double {
+  func convert(from interval: DispatchTimeInterval) -> Double {
     switch interval {
     case .seconds(let val), .milliseconds(let val), .microseconds(let val), .nanoseconds(let val):
       return Double(val) * interval.intervalMultiplier / nanoSecondsMultiplier
