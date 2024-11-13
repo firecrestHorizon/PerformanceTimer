@@ -8,8 +8,9 @@ Precise time measurement supporting conversions to alternative time units (secon
   - Basic stopwatch functions: `start()`, `stop()`, and `reset()`
   - Lap times: Call `lap()` while timer is running to record a lap time
   - Elapsed time: Call `elasped` to get the current timer value without recording a lap time
+  - Measure the execution time of an async function
   
-### Example
+### Examples
 
 ```swift
 // Initialize the timer, setting the reporting units to milliseconds
@@ -57,6 +58,25 @@ for (index, time) in timer.times.enumerated() {
 // ...
 ```
 
+To time how long to run a single async function, we can run the function in the `measureAsync` closure...
+```swift
+// Some function for which we need to time how long it takes to run
+func someAsyncTask() async throws -> String {
+  sleep(2)
+  return "Slept for 2 seconds"
+}
+
+// Create an instance of the timer and execute the function in the `measureAsync` closure
+var timer = PerformanceTimer(reportingUnits: .milliseconds)
+do {
+  let (result, time) = try await timer.measureAsync {
+    try await someAsyncTask()
+  }
+  print("Task Result: \(result), Took: \(time) \(timer.reportingUnits.label)")    
+} catch {
+  print("Error: \(error)")
+}
+```
 
 ### Contributing
 
