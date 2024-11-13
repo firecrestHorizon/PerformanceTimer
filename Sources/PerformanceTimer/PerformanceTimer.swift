@@ -11,26 +11,33 @@ public struct PerformanceTimer {
   private(set) var times: [DispatchTime] = []
   private var isRunning: Bool = false
   public let reportingUnits: PerformanceTimerUnits
+  private let queue = DispatchQueue(label: "uk.firecresthorizon.performanceTimer.queue")
   
   /// Time between the start and stop (or last lap) times
   public var total: Double {
-    guard let first = times.first, let last = times.last else { return 0.0 }
-    return reportingUnits.convert(from: first.distance(to: last))
+    queue.sync {
+      guard let first = times.first, let last = times.last else { return 0.0 }
+      return reportingUnits.convert(from: first.distance(to: last))
+    }
   }
   
   /// Array of the lap times
   public var laps: [Double] {
-    zip(times, times.dropFirst()).map { previous, current in
-      reportingUnits.convert(from: previous.distance(to: current))
+    queue.sync {
+      zip(times, times.dropFirst()).map { previous, current in
+        reportingUnits.convert(from: previous.distance(to: current))
+      }
     }
   }
   
   /// Elapsed time from the start time to .now() or the stop time if the timer has been stopped
   public var elapsed: Double {
-    guard let startTime = times.first else { return 0.0 }
-    let endTime = isRunning ? DispatchTime.now() : times.last!
-    
-    return reportingUnits.convert(from: startTime.distance(to: endTime))
+    queue.sync {
+      guard let startTime = times.first else { return 0.0 }
+      let endTime = isRunning ? DispatchTime.now() : times.last!
+      
+      return reportingUnits.convert(from: startTime.distance(to: endTime))
+    }
   }
   
   public init(reportingUnits: PerformanceTimerUnits = .nanoseconds) {
@@ -39,33 +46,48 @@ public struct PerformanceTimer {
   
   /// Clear the previous times, record the start time and set the timer as running
   public mutating func start() {
-    reset()
-    _ = lap()
+    resetInternal()
+    lapInternal()
   }
   
   /// Record the lap time, then calculate the interval from the previous start/lap and return the value
+  @discardableResult
   public mutating func lap() -> Double {
-    isRunning = true
-    let lapTime = DispatchTime.now()
-    guard let previousTime = times.last else {
+    lapInternal()
+  }
+  
+  /// In internal version of `lap` that handles thread safety and will also handle the `isRunning` flag state
+  @discardableResult
+  private mutating func lapInternal(atStop: Bool = false) -> Double {
+    queue.sync {
+      isRunning = !atStop
+      let lapTime = DispatchTime.now()
+      guard let previousTime = times.last else {
+        times.append(lapTime)
+        return 0.0
+      }
       times.append(lapTime)
-      return 0.0
+      return reportingUnits.convert(from: previousTime.distance(to: lapTime))
     }
-    times.append(lapTime)
-    return reportingUnits.convert(from: previousTime.distance(to: lapTime))
   }
   
   /// Record the stop time, set the timer to stopped, then calculate the interval from the previous start/lap and return the value
+  @discardableResult
   public mutating func stop() -> Double {
-    let lapTime = lap()
-    isRunning = false
-    return lapTime
+    return lapInternal(atStop: true)
   }
   
   /// Stop the timer and clear stored lap times
   public mutating func reset() {
-    isRunning = false
-    times.removeAll()
+    resetInternal()
+  }
+  
+  /// An internal version of `reset` that handles thread safety
+  private mutating func resetInternal() {
+    queue.sync {
+      isRunning = false
+      times.removeAll()
+    }
   }
 }
 

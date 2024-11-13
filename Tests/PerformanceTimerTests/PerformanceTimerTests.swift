@@ -40,3 +40,22 @@ import Testing
     print("Lap \(index) DispatchTime: \(time)")
   }
 }
+
+@Test func measureExecutionTime() async throws {
+  func someAsyncTask() async throws -> String {
+    sleep(2)
+    return "Slept for 2 seconds"
+  }
+  
+  var timer = PerformanceTimer(reportingUnits: .milliseconds)
+  
+  do {
+    let (result, time) = try await timer.measureAsync {
+      try await someAsyncTask()
+    }
+    print("Task Result: \(result), Took: \(time) \(timer.reportingUnits.label)")    
+  } catch {
+    print("Error: \(error)")
+  }
+  
+}
